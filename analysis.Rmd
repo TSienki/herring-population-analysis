@@ -1,0 +1,73 @@
+---
+title: "Projekt z analizy danych - analiza długości śledzia oceanicznego wyławianego w Europie."
+author: Tomasz Sienkiewicz, Jakub Zdanowski
+date: "`r format(Sys.time(), '%d %B, %Y')`"
+output: 
+  html_document:
+    toc: true
+    toc_float: true
+---
+
+# Wprowadzenie
+### Opis problemu
+Celem projektu jest określenie głównych przyczyn stopniowego zmniejszania się długości śledzi oceanicznych wyławionych w Europie.
+
+### Opis danych 
+Zbiór danych do analizy składa się z pomiarów śledzi i warunków w jakich żyją z ostatnich 60 lat. Dane były pobierane z połowów komercyjnych jednostek. W ramach połowu jednej jednostki losowo wybierano od 50 do 100 sztuk trzyletnich śledzi.
+
+### Opis zmiennych: 
+
+* __<span style="color:red">length</span>__: długość złowionego śledzia [cm];
+* __cfin1__: dostępność planktonu [zagęszczenie Calanus
+finmarchicus gat. 1];
+* __cfin2__: dostępność planktonu [zagęszczenie Calanus finmarchicus gat. 2];
+* __chel1__: dostępność planktonu [zagęszczenie Calanus helgolandicus gat. 1];
+* __chel2__: dostępność planktonu [zagęszczenie Calanus helgolandicus gat. 2];
+* __lcop1__: dostępność planktonu [zagęszczenie widłonogów gat. 1];
+* __lcop2__: dostępność planktonu [zagęszczenie widłonogów gat. 2];
+* __fbar__: natężenie połowów w regionie [ułamek pozostawionego narybku];
+* __recr__: roczny narybek [liczba śledzi];
+* __cumf__: łączne roczne natężenie połowów w regionie [ułamek pozostawionego narybku];
+* __totaln__: łączna liczba ryb złowionych w ramach połowu [liczba śledzi];
+* __sst__: temperatura przy powierzchni wody [°C];
+* __sal__: poziom zasolenia wody [Knudsen ppt];
+* __xmonth__: miesiąc połowu [numer miesiąca];
+* __nao__: oscylacja północnoatlantycka [mb].
+
+### Inicjalizacja środowiska 
+
+```{r results=FALSE}
+library(dplyr)
+library(DT)
+prettyTable <- function(table_df, round_columns=numeric(), round_digits=2) {
+    DT::datatable(table_df, style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))) %>%
+    formatRound(round_columns, round_digits)
+}
+```
+# Analiza
+
+```{r}
+set.seed(23)
+data <- read.csv("sledzie.csv")
+
+paste0("Ilość badanych przypadków: ", dim(data)[1], ", ilość zmiennych: ", dim(data)[2])
+summary(data)
+head(data)
+```
+
+```{r}
+```
+
+# Wymagania
+**Do usunięcia później**
+
+1. Kod wyliczający wykorzystane biblioteki.
+2. Kod zapewniający powtarzalność wyników przy każdym uruchomieniu raportu na tych samych danych.
+3. Kod pozwalający wczytać dane z pliku.
+4. Kod przetwarzający brakujące dane.
+5. Sekcję podsumowującą rozmiar zbioru i podstawowe statystyki.
+6. Szczegółową analizę wartości atrybutów (np. poprzez prezentację rozkładów wartości).
+7. Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji.
+8. Interaktywny wykres lub animację prezentującą zmianę rozmiaru śledzi w czasie.
+9. Sekcję próbującą stworzyć regresor przewidujący rozmiar śledzia (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność regresji powinna zostać oszacowana na podstawie miar R2 i RMSE.
+10. Analizę ważności atrybutów najlepszego znalezionego modelu regresji. Analiza ważności atrybutów powinna stanowić próbę odpowiedzi na pytanie: co sprawia, że rozmiar śledzi zaczął w pewnym momencie maleć.
