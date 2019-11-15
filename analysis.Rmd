@@ -17,6 +17,8 @@ Zbiór danych do analizy składa się z pomiarów śledzi i warunków w jakich �
 
 ### Opis zmiennych: 
 
+Wszystkie dane, są danymi liczbowymi, nie występują żadne dane kategoryczne.
+
 * __<span style="color:red">length</span>__: długość złowionego śledzia [cm];
 * __cfin1__: dostępność planktonu [zagęszczenie Calanus
 finmarchicus gat. 1];
@@ -28,7 +30,7 @@ finmarchicus gat. 1];
 * __fbar__: natężenie połowów w regionie [ułamek pozostawionego narybku];
 * __recr__: roczny narybek [liczba śledzi];
 * __cumf__: łączne roczne natężenie połowów w regionie [ułamek pozostawionego narybku];
-* __totaln__: łączna liczba ryb złowionych w ramach połowu [liczba śledzi];
+* __totaln__: łączna liczba ryb złowionych w ramach połowu [liczba śledzi] - liczba całkowita;
 * __sst__: temperatura przy powierzchni wody [°C];
 * __sal__: poziom zasolenia wody [Knudsen ppt];
 * __xmonth__: miesiąc połowu [numer miesiąca];
@@ -38,22 +40,125 @@ finmarchicus gat. 1];
 
 ```{r results=FALSE}
 library(dplyr)
+library(ggplot2)
+library(GGally) # ggpairplot
 library(DT)
+library(mice) # for missing data
+library(VIM)
+library(ggpubr) # ggarange
+
 prettyTable <- function(table_df, round_columns=numeric(), round_digits=2) {
     DT::datatable(table_df, style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))) %>%
     formatRound(round_columns, round_digits)
 }
 ```
+```{r}
+# Multiple plot function
+#
+# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
+# - cols:   Number of columns in layout
+# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
+#
+# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
+# then plot 1 will go in the upper left, 2 will go in the upper right, and
+# 3 will go all the way across the bottom.
+#
+multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
+  library(grid)
+
+  # Make a list from the ... arguments and plotlist
+  plots <- c(list(...), plotlist)
+
+  numPlots = length(plots)
+
+  # If layout is NULL, then use 'cols' to determine layout
+  if (is.null(layout)) {
+    # Make the panel
+    # ncol: Number of columns of plots
+    # nrow: Number of rows needed, calculated from # of cols
+    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
+                    ncol = cols, nrow = ceiling(numPlots/cols))
+  }
+
+ if (numPlots==1) {
+    print(plots[[1]])
+
+  } else {
+    # Set up the page
+    grid.newpage()
+    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
+
+    # Make each plot, in the correct location
+    for (i in 1:numPlots) {
+      # Get the i,j matrix positions of the regions that contain this subplot
+      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
+
+      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
+                                      layout.pos.col = matchidx$col))
+    }
+  }
+}
+```
+
+
+
 # Analiza
+
+### Wczytanie i wstepnę oczyszczenie danych
+
+Pierwszym krokiem jest wczytanie danych oraz bliższe przyjżenie się im. Ponieważ w pliku csv brakujące rekordy zapisane są jako "?" trzeba je poprawnie wczytać.Brakujące dane występują w kolumnach cfin1, cfin2, chel1, chel2, lcop1, lcop2 i lsst. 
+Jako że kolumna x to po prostu numer pomiaru, nie będzie nam potrzebna.
 
 ```{r}
 set.seed(23)
-data <- read.csv("sledzie.csv")
+data <- read.csv("sledzie.csv", na.strings = c("?"))
+lapply(data, function(x) any(is.na(x)))
+data <- subset(data, select = -c(X))
 
-paste0("Ilość badanych przypadków: ", dim(data)[1], ", ilość zmiennych: ", dim(data)[2])
 summary(data)
-head(data)
+paste0("Ilość badanych przypadków: ", nrow(data), ", ilość zmiennych: ", ncol(data))
+head(data, 10)
 ```
+W celu poradzenia sobie z brakującymi danymi zostaje wykorzystana metoda MICE (Multivariate Imputation via Chained Equations). Metoda ta pozwala na pozbycie się brakujących danych z utrzymaniem podobnego rozkład
+
+```{r}
+plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=function(x) x){
+  if(!is.null(columns)){
+    columns <- names(data)
+  }
+  
+  i <- 1
+  plots <- list()
+  for (column_name in missing_data_columns){
+    p <- ggplot(data, aes_string(x = column_name)) + 
+      geom_histogram(color="black", fill="white") +
+      ggtitle(createName(column_name))
+    plots[[i]] <- p
+    i <- i + 1
+  }
+  figure <- ggarrange(plotlist = plots, ncol = ncol, nrow = nrow)
+  # annotate_figure(figure, top = text_grob("dddDDDD"))
+  figure
+}
+
+  
+
+missing_data_columns <- c("cfin1", "cfin2", "chel1", "chel2", "lcop1", "lcop2", "sst")
+plot_histograms(data, columns = missing_data_columns, createName = function(x) paste0("Histogram ", x, " przed pozbyciem się brakujących danych"), nrow=2)
+# mice_plot <- aggr(data, col=c('navyblue','yellow'),
+#                     numbers=TRUE, sortVars=TRUE,
+#                     labels=names(data), cex.axis=.7,
+#                     gap=3, ylab=c("Missing data","Pattern"))
+completed_data <- data %>%
+  mice(m=5,  method = 'cart', seed = 63) %>%
+  complete(2)
+plot_histograms(completed_data, columns = missing_data_columns, createName = function(x) paste0("Histogram ", x, " po pozbyciu się brakujących danych"), nrow=2)
+# Plots could be better, but R is stupid language and I have problem with it. 
+
+```
+
+### Eksploracja danych 
+
 
 ```{r}
 ```
