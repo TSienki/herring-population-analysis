@@ -8,6 +8,9 @@ output:
     toc_float: true
 ---
 
+# Podsumowanie analizy
+Podsumowanie jakieś 
+
 # Wprowadzenie
 ### Opis problemu
 Celem projektu jest określenie głównych przyczyn stopniowego zmniejszania się długości śledzi oceanicznych wyławionych w Europie.
@@ -20,8 +23,7 @@ Zbiór danych do analizy składa się z pomiarów śledzi i warunków w jakich �
 Wszystkie dane, są danymi liczbowymi, nie występują żadne dane kategoryczne.
 
 * __<span style="color:red">length</span>__: długość złowionego śledzia [cm];
-* __cfin1__: dostępność planktonu [zagęszczenie Calanus
-finmarchicus gat. 1];
+* __cfin1__: dostępność planktonu [zagęszczenie Calanus finmarchicus gat. 1];
 * __cfin2__: dostępność planktonu [zagęszczenie Calanus finmarchicus gat. 2];
 * __chel1__: dostępność planktonu [zagęszczenie Calanus helgolandicus gat. 1];
 * __chel2__: dostępność planktonu [zagęszczenie Calanus helgolandicus gat. 2];
@@ -44,8 +46,26 @@ library(ggplot2)
 library(GGally) # ggpairplot
 library(DT)
 library(mice) # for missing data
-library(VIM)
+#ibrary(VIM)
 library(ggpubr) # ggarange
+library(corrplot) # ggarange
+library(plotly)
+
+columns_names <- c("length" = "długość złowionego śledzia [cm]",
+  "cfin1" = "dostępność planktonu [zagęszczenie Calanus finmarchicus gat. 1]",
+  "cfin2" = "dostępność planktonu [zagęszczenie Calanus finmarchicus gat. 2]",
+  "chel1" = "dostępność planktonu [zagęszczenie Calanus helgolandicus gat. 1]",
+  "chel2" = "dostępność planktonu [zagęszczenie Calanus helgolandicus gat. 2]",
+  "lcop1" = "dostępność planktonu [zagęszczenie widłonogów gat. 1]",
+  "lcop2" = "dostępność planktonu [zagęszczenie widłonogów gat. 2]",
+  "fbar" = "natężenie połowów w regionie [ułamek pozostawionego narybku]",
+  "recr" = "roczny narybek [liczba śledzi]",
+  "cumf" = "łączne roczne natężenie połowów w regionie [ułamek pozostawionego narybku]",
+  "totaln" = "łączna liczba ryb złowionych w ramach połowu [liczba śledzi]",
+  "sst" = "temperatura przy powierzchni wody [°C]",
+  "sal"  = "poziom zasolenia wody [Knudsen ppt]",
+  "xmonth" = "miesiąc połowu [numer miesiąca]",
+  "nao" = "oscylacja północnoatlantycka [mb]" )
 
 prettyTable <- function(table_df, round_columns=numeric(), round_digits=2) {
     DT::datatable(table_df, style="bootstrap", filter = "top", rownames = FALSE, extensions = "Buttons", options = list(dom = 'Bfrtip', buttons = c('copy', 'csv', 'excel', 'pdf', 'print'))) %>%
@@ -123,16 +143,17 @@ W celu poradzenia sobie z brakującymi danymi zostaje wykorzystana metoda MICE (
 
 ```{r}
 plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=function(x) x){
-  if(!is.null(columns)){
+  if(is.null(columns)){
     columns <- names(data)
-  }
+  } 
   
   i <- 1
   plots <- list()
-  for (column_name in missing_data_columns){
+  for (column_name in columns){
     p <- ggplot(data, aes_string(x = column_name)) + 
-      geom_histogram(color="black", fill="white") +
-      ggtitle(createName(column_name))
+      geom_histogram(color="black", fill="orange") +
+      ggtitle(createName(column_name)) + 
+      ylab("Liczba obserwacji")
     plots[[i]] <- p
     i <- i + 1
   }
@@ -140,6 +161,7 @@ plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=funct
   # annotate_figure(figure, top = text_grob("dddDDDD"))
   figure
 }
+
 
   
 
@@ -159,20 +181,111 @@ plot_histograms(completed_data, columns = missing_data_columns, createName = fun
 
 ### Eksploracja danych 
 
+```{r eval=FALSE}
+make.assign_year <- function() {
+  last_year <- 0
+  last_month <- completed_data$xmonth[1]
+  
+  assign_year <- function(month){
+    lm <- last_month
+    if(month < last_month){
+      last_year <<- last_year + 1
+    }
+    last_month <<- month
+    print(gettextf("%d %d", last_month, lm))
+    last_year
+  }
+  return(assign_year)
+}
 
-```{r}
+assign_year <- 
+
+assign_year(8)
+assign_year(8)
+assign_year(9)
+assign_year(1)
+assign_year(2)
+assign_year(0)
+last_month
 ```
 
+Podsumowanie danych
+```{r}
+summary(completed_data)
+```
+
+Histogramy wartości atrybutów w zbiorze danych 
+```{r}
+plot_histograms(completed_data, createName = function(x) paste0("Histogram - ", columns_names[x]), nrow=1)
+
+```
+
+Poniżej została przedstawiona korelacja pomiędzy atrybutami.
+Można zauważyć, że występuje wysoka korelacja pomiędzy parami atrybutów chel1-lcop1, chel2-lcop2 oraz fbar-cumf. Korelacja może występować, ponieważ, dwie pierwsze pary związane są z dostępnością zaś ostatnia para korelacji może występować, ponieważ obydwa atrybuty związane są z natężeniem popłowu w regionie. Można te pary zredukować, aby przeciwdziałać klątwie wielowymiarowości - jednakże tutaj zostaną one zostawione bez zmian. 
+
+```{r}
+corrplot(cor(completed_data), type = "upper",  tl.col = "black", tl.srt = 45, method="number")
+
+ggplot(completed_data, aes(x=chel1, y=lcop1)) + 
+  geom_point() + 
+  geom_smooth(method=lm) +
+  ggtitle("Zależność pomiędzy atrybytem chel1 i lcop1")
+
+linear_model_1 <- lm(chel1 ~ lcop1, data = completed_data)
+
+
+ggplot(completed_data, aes(x=chel2, y=lcop2)) + 
+  geom_point() + 
+  geom_smooth(method=lm) +
+  ggtitle("Zależność pomiędzy atrybytem chel2 i lcop2")
+linear_model_2 <- lm(chel2 ~ lcop2, data = completed_data)
+
+
+ggplot(completed_data, aes(x=fbar, y=cumf)) + 
+  geom_point() + 
+  geom_smooth(method=lm) +
+  ggtitle("Zależność pomiędzy atrybytem fbar i cumf")
+linear_model_3 <- lm(fbar ~ cumf, data = completed_data)
+
+```
+
+Poniżej przedstawiona została analiza długości śledzia na przestrzeni czasu. Jednakże czas nie był przedstawiony jawnie, ale wiadomo, że dane są ustawione chronologicznie dzięki czemu, zbiór można podzielić i na każdym z podziałów policzyć średnią. 
+```{r}
+cases_per_aggregate <- 200
+aggregated_data <- aggregate(completed_data, 
+                        list(rep(1:(nrow(completed_data)%/%cases_per_aggregate+1), each=cases_per_aggregate, len=nrow(completed_data))),
+                        mean) # Try using mean without outliners
+aggregated_data$time_period = c(1:nrow(aggregated_data))
+ggplot(aggregated_data, aes(time_period, length)) +
+  geom_point() + 
+  geom_smooth() +
+  ggtitle("Wykres zmiany długości śledzia na przestrzeni czasu") +
+  ylab("Długość śledzia") +
+  xlab("Przedział czasowy")
+```
+
+```{r}
+plot_ly(data = aggregated_data, x = ~time_period, y = ~length,
+            text = ~paste("Length: ", length)) 
+# %>% layout(
+#               scene = list(
+#                  xaxis = list(title = "Przedział czasowy"),
+#                  yaxis = list(title = "Długość śledzia")
+#               )
+#             )
+```
 # Wymagania
 **Do usunięcia później**
+TODO
+5. Sekcję podsumowującą rozmiar zbioru i podstawowe statystyki.
+9. Sekcję próbującą stworzyć regresor przewidujący rozmiar śledzia (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność regresji powinna zostać oszacowana na podstawie miar R2 i RMSE.
+10. Analizę ważności atrybutów najlepszego znalezionego modelu regresji. Analiza ważności atrybutów powinna stanowić próbę odpowiedzi na pytanie: co sprawia, że rozmiar śledzi zaczął w pewnym momencie maleć.
 
+Done
 1. Kod wyliczający wykorzystane biblioteki.
 2. Kod zapewniający powtarzalność wyników przy każdym uruchomieniu raportu na tych samych danych.
 3. Kod pozwalający wczytać dane z pliku.
 4. Kod przetwarzający brakujące dane.
-5. Sekcję podsumowującą rozmiar zbioru i podstawowe statystyki.
 6. Szczegółową analizę wartości atrybutów (np. poprzez prezentację rozkładów wartości).
 7. Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji.
 8. Interaktywny wykres lub animację prezentującą zmianę rozmiaru śledzi w czasie.
-9. Sekcję próbującą stworzyć regresor przewidujący rozmiar śledzia (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność regresji powinna zostać oszacowana na podstawie miar R2 i RMSE.
-10. Analizę ważności atrybutów najlepszego znalezionego modelu regresji. Analiza ważności atrybutów powinna stanowić próbę odpowiedzi na pytanie: co sprawia, że rozmiar śledzi zaczął w pewnym momencie maleć.
