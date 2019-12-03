@@ -9,7 +9,7 @@ output:
 ---
 
 # Podsumowanie analizy
-Podsumowanie jakieś 
+
 
 # Wprowadzenie
 ### Opis problemu
@@ -40,16 +40,16 @@ Wszystkie dane, są danymi liczbowymi, nie występują żadne dane kategoryczne.
 
 ### Inicjalizacja środowiska 
 
-```{r results=FALSE}
+```{r echo=FALSE, results='hide', message=FALSE}
 library(dplyr)
 library(ggplot2)
 library(GGally) # ggpairplot
 library(DT)
 library(mice) # for missing data
-#ibrary(VIM)
 library(ggpubr) # ggarange
 library(corrplot) # ggarange
 library(plotly)
+library(caret)
 
 columns_names <- c("length" = "długość złowionego śledzia [cm]",
   "cfin1" = "dostępność planktonu [zagęszczenie Calanus finmarchicus gat. 1]",
@@ -72,59 +72,12 @@ prettyTable <- function(table_df, round_columns=numeric(), round_digits=2) {
     formatRound(round_columns, round_digits)
 }
 ```
-```{r}
-# Multiple plot function
-#
-# ggplot objects can be passed in ..., or to plotlist (as a list of ggplot objects)
-# - cols:   Number of columns in layout
-# - layout: A matrix specifying the layout. If present, 'cols' is ignored.
-#
-# If the layout is something like matrix(c(1,2,3,3), nrow=2, byrow=TRUE),
-# then plot 1 will go in the upper left, 2 will go in the upper right, and
-# 3 will go all the way across the bottom.
-#
-multiplot <- function(..., plotlist=NULL, file, cols=1, layout=NULL) {
-  library(grid)
-
-  # Make a list from the ... arguments and plotlist
-  plots <- c(list(...), plotlist)
-
-  numPlots = length(plots)
-
-  # If layout is NULL, then use 'cols' to determine layout
-  if (is.null(layout)) {
-    # Make the panel
-    # ncol: Number of columns of plots
-    # nrow: Number of rows needed, calculated from # of cols
-    layout <- matrix(seq(1, cols * ceiling(numPlots/cols)),
-                    ncol = cols, nrow = ceiling(numPlots/cols))
-  }
-
- if (numPlots==1) {
-    print(plots[[1]])
-
-  } else {
-    # Set up the page
-    grid.newpage()
-    pushViewport(viewport(layout = grid.layout(nrow(layout), ncol(layout))))
-
-    # Make each plot, in the correct location
-    for (i in 1:numPlots) {
-      # Get the i,j matrix positions of the regions that contain this subplot
-      matchidx <- as.data.frame(which(layout == i, arr.ind = TRUE))
-
-      print(plots[[i]], vp = viewport(layout.pos.row = matchidx$row,
-                                      layout.pos.col = matchidx$col))
-    }
-  }
-}
-```
 
 
 
 # Analiza
 
-### Wczytanie i wstepnę oczyszczenie danych
+### Wczytanie i wstepne oczyszczenie danych
 
 Pierwszym krokiem jest wczytanie danych oraz bliższe przyjżenie się im. Ponieważ w pliku csv brakujące rekordy zapisane są jako "?" trzeba je poprawnie wczytać.Brakujące dane występują w kolumnach cfin1, cfin2, chel1, chel2, lcop1, lcop2 i lsst. 
 Jako że kolumna x to po prostu numer pomiaru, nie będzie nam potrzebna.
@@ -141,8 +94,8 @@ head(data, 10)
 ```
 W celu poradzenia sobie z brakującymi danymi zostaje wykorzystana metoda MICE (Multivariate Imputation via Chained Equations). Metoda ta pozwala na pozbycie się brakujących danych z utrzymaniem podobnego rozkład
 
-```{r}
-plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=function(x) x){
+```{r cache = true}
+plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=function(x) x, bins=30){
   if(is.null(columns)){
     columns <- names(data)
   } 
@@ -151,14 +104,14 @@ plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=funct
   plots <- list()
   for (column_name in columns){
     p <- ggplot(data, aes_string(x = column_name)) + 
-      geom_histogram(color="black", fill="orange") +
+      geom_histogram(color="black", fill="orange", bins=bins) +
+      # geom_density() +
       ggtitle(createName(column_name)) + 
       ylab("Liczba obserwacji")
     plots[[i]] <- p
     i <- i + 1
   }
   figure <- ggarrange(plotlist = plots, ncol = ncol, nrow = nrow)
-  # annotate_figure(figure, top = text_grob("dddDDDD"))
   figure
 }
 
@@ -172,42 +125,13 @@ plot_histograms(data, columns = missing_data_columns, createName = function(x) p
 #                     labels=names(data), cex.axis=.7,
 #                     gap=3, ylab=c("Missing data","Pattern"))
 completed_data <- data %>%
-  mice(m=5,  method = 'cart', seed = 63) %>%
+  mice(m=3,  method = 'cart', seed = 63) %>%
   complete(2)
 plot_histograms(completed_data, columns = missing_data_columns, createName = function(x) paste0("Histogram ", x, " po pozbyciu się brakujących danych"), nrow=2)
-# Plots could be better, but R is stupid language and I have problem with it. 
 
 ```
 
 ### Eksploracja danych 
-
-```{r eval=FALSE}
-make.assign_year <- function() {
-  last_year <- 0
-  last_month <- completed_data$xmonth[1]
-  
-  assign_year <- function(month){
-    lm <- last_month
-    if(month < last_month){
-      last_year <<- last_year + 1
-    }
-    last_month <<- month
-    print(gettextf("%d %d", last_month, lm))
-    last_year
-  }
-  return(assign_year)
-}
-
-assign_year <- 
-
-assign_year(8)
-assign_year(8)
-assign_year(9)
-assign_year(1)
-assign_year(2)
-assign_year(0)
-last_month
-```
 
 Podsumowanie danych
 ```{r}
@@ -215,8 +139,10 @@ summary(completed_data)
 ```
 
 Histogramy wartości atrybutów w zbiorze danych 
+Jak można zauwyć wartości długości śledzia przyjmują rozkład normalny z średnią na poziomie 25.3 cm i przyjmuje wartości w granicach 19-32.5cm. 
 ```{r}
-plot_histograms(completed_data, createName = function(x) paste0("Histogram - ", columns_names[x]), nrow=1)
+plot_histograms(completed_data, createName = function(x) paste0("Histogram - ", columns_names[x]), nrow=1, bins=40)
+
 
 ```
 
@@ -229,7 +155,7 @@ corrplot(cor(completed_data), type = "upper",  tl.col = "black", tl.srt = 45, me
 ggplot(completed_data, aes(x=chel1, y=lcop1)) + 
   geom_point() + 
   geom_smooth(method=lm) +
-  ggtitle("Zależność pomiędzy atrybytem chel1 i lcop1")
+  ggtitle("Zależność pomiędzy atrybutem chel1 i lcop1")
 
 linear_model_1 <- lm(chel1 ~ lcop1, data = completed_data)
 
@@ -237,19 +163,19 @@ linear_model_1 <- lm(chel1 ~ lcop1, data = completed_data)
 ggplot(completed_data, aes(x=chel2, y=lcop2)) + 
   geom_point() + 
   geom_smooth(method=lm) +
-  ggtitle("Zależność pomiędzy atrybytem chel2 i lcop2")
+  ggtitle("Zależność pomiędzy atrybutem chel2 i lcop2")
 linear_model_2 <- lm(chel2 ~ lcop2, data = completed_data)
 
 
 ggplot(completed_data, aes(x=fbar, y=cumf)) + 
   geom_point() + 
   geom_smooth(method=lm) +
-  ggtitle("Zależność pomiędzy atrybytem fbar i cumf")
+  ggtitle("Zależność pomiędzy atrybutem fbar i cumf")
 linear_model_3 <- lm(fbar ~ cumf, data = completed_data)
 
 ```
 
-Poniżej przedstawiona została analiza długości śledzia na przestrzeni czasu. Jednakże czas nie był przedstawiony jawnie, ale wiadomo, że dane są ustawione chronologicznie dzięki czemu, zbiór można podzielić i na każdym z podziałów policzyć średnią. 
+Poniżej przedstawiona została analiza długości śledzia na przestrzeni czasu. Jednakże czas nie był przedstawiony jawnie, ale wiadomo, że dane są ustawione chronologicznie dzięki czemu, zbiór można podzielić i na każdym z podziałów policzyć średnią. Można zauważyć, że na początku długość śledzia na przestrzeni czasu wzrastała od średniej wielkości w oklicach 24.5 cm do wielkości wielkości przekraczającej 27cm. Jednakże później trend się odwrócił i ostatecznie na sam koniec średnia ta była poniżej 24 cm. 
 ```{r}
 cases_per_aggregate <- 200
 aggregated_data <- aggregate(completed_data, 
@@ -262,6 +188,7 @@ ggplot(aggregated_data, aes(time_period, length)) +
   ggtitle("Wykres zmiany długości śledzia na przestrzeni czasu") +
   ylab("Długość śledzia") +
   xlab("Przedział czasowy")
+
 ```
 
 ```{r}
@@ -274,6 +201,125 @@ plot_ly(data = aggregated_data, x = ~time_period, y = ~length,
 #               )
 #             )
 ```
+# Regresor
+
+```{r}
+
+train_index <- createDataPartition(completed_data$length, p = .7, 
+                                  list = FALSE, 
+                                  times = 1)
+training <- completed_data[ train_index,]
+testing  <- completed_data[-train_index,]
+```
+
+## Random Forest
+
+It works, but without grid searching. 
+```{r}
+set.seed(23)
+
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 5,
+  repeats = 3,
+  search = 'random'
+)
+
+
+random_forest <- train(length ~ .,
+             data = training,
+             method = "rf",
+             preProc = c("center", "scale"),
+             metric = "RMSE",
+             trControl = ctrl,
+             ntree = 10,
+             importance=TRUE,
+             verbose=TRUE)
+
+```
+
+```{r}
+evaluate_model <- function(model, test_data) {
+  plot <- ggplot(varImp(model))
+  print(plot)
+  print(model)
+  predicted <- predict(model, newdata = test_data)
+  print(paste0("RMSE, na zbiorze testowym: ", RMSE(predicted, testing$length), " R-Squared na zbiorze testowym ", r_squared(predicted, test_data$length))) 
+}
+
+evaluate_model(random_forest, training)
+
+```
+
+It doesn't work (slow computing) :/  
+
+```{r}
+set.seed(23)
+modelLookup(model='rf')
+
+rf_grid <- expand.grid(mtry=c(2, 3, 4, 5, 6, 7, 8, 9, 11, 14))
+
+ctrl <- trainControl(
+  method = "repeatedcv",
+  number = 5,
+  repeats = 3
+  )
+
+
+random_forest <- train(length ~ .,
+             data = training,
+             method = "rf",
+             preProc = c("center", "scale"),
+             metric = "RMSE",
+             trControl = ctrl,
+             tuneGrid = rf_grid,
+             ntree = 10,
+             importance=TRUE)
+
+evaluate_model(random_forest, training)
+
+```
+
+
+## Gradient Boosting Regressor
+
+It doesn't work (slow computing) :/  
+
+
+```{r}
+
+modelLookup(model='gbm')
+
+gbm_grid <- expand.grid(
+  n.trees=c(10,20,50,100,500,1000),
+  shrinkage=c(0.01,0.05,0.1,0.5),
+  n.minobsinnode = c(3,5,10),
+  interaction.depth=c(1,5,10)
+  )
+
+set.seed(23)
+gbm_grid 
+# gbm_grid <-  expand.grid(interaction.depth = c(1, 3, 6, 9, 10),
+#                     n.trees = (0:50)*50, 
+#                     shrinkage = seq(.0005, .05,.0005),
+#                     n.minobsinnode = c(5, 10, 15, 20))
+
+
+gbm <- train(length ~ ., 
+             data = training, 
+             method = "gbm", 
+             metric = "RMSE",
+             trControl = ctrl,
+             tuneGrid = gbm_grid,
+             preProc = c("center", "scale"),
+             verbose = FALSE)
+
+evaluate_model(gbm)
+```
+
+## Random Forest
+
+
 # Wymagania
 **Do usunięcia później**
 TODO
