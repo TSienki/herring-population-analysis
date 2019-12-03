@@ -210,6 +210,9 @@ train_index <- createDataPartition(completed_data$length, p = .7,
                                   times = 1)
 training <- completed_data[ train_index,]
 testing  <- completed_data[-train_index,]
+
+r_squared <- function (x, y) cor(x, y) ^ 2
+
 ```
 
 ## Random Forest
