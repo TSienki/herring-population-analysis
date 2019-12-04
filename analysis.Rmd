@@ -328,7 +328,7 @@ ggplot(varImp(gbm))
 
 ## Podsumowanie regresorów 
 
-Jak można zauważyć poniżej najlepszymi modelami okazały się modele oparte na algorytmach Gradient Boosting i Random Forest. Nieco gorzej sprawdza się algorytm random forest. Najgorzej i poniżej oczekiwań działa algorytm Elastic Net, co może być związane z wykorzystaniem regresji liniowej wewnątrz algorytmu. 
+Jak można zauważyć poniżej najlepszymi modelami okazały się modele oparte na algorytmach Gradient Boosting i Random Forest. Jest nieznaczna różnica pomiędzy tymi algorytmami. Nieco gorzej sprawdza się algorytm random forest. Najgorzej i poniżej oczekiwań działa algorytm Elastic Net, co może być związane z wykorzystaniem regresji liniowej wewnątrz algorytmu. 
 
 ```{r}
 metrics <- data.frame(
@@ -345,13 +345,10 @@ Najważniejszymi atrybutami dla algorytmu Gradient Boosting były sst, recr i xm
 
 Można się spodziewać, że atrybut xmonth jest skorelowany z długością (jest to najistotniejszy atrybut dla Random Forest i trzeci najbardziej istotny dla Gradient Boosting). Jednakże nie oznacza to, że jest to wynik wieloletniego trendu, a może na przykład wynikać z wahań związanych z okresami godowymi lub okresami zwiększonego połowu.  
 Można zauważyć dużą istotność atrybutu sst - najistotniejszy atrybut dla Gradient Boosting, trzeci najbardziej istotny dla Elastic Net. Na wykresie poniżej można zauważyć że średnia długość śledzia jest przeciwnie skorelowana z temperaturą wody przy powierzchni. Może to świadczyć, że jest to powód zmian długości śledzi na przestrzeni lat.
-Mimo występowania korelacji pomiędzy długością, a oscylacją północnoatlantycką, żaden z regresorów nie uznawał tego atrybutu za istotny. 
-Często istotnym atrybutem jest atrybut lcop1 (jak i chel1 poprzez korelacje) czyli dostępność planktonu [zagęszczenie widłonogów gat. 1]. Można zauważyć podobny trend zmian tych wartości do trendu zmian wartości długości. Dodatkowo jest on skorelowany z oscylacją północnoatlantycką, przez co nie występuje ten drugi atrybut w istotnych atrybutach.  Mniejszą zależność widać w przypadku lcop2 (i chel2). 
-Wartości cumf i rect wydają się nie mieć wpływu na zmianę długości śledzia na przestrzeni lat. 
+
 
 
 ```{r}
-
 ggplot(aggregated_data, aes(x = time_period)) +
   geom_point(aes(y = sst * 2, colour = "sst")) +
   geom_point(aes(y = length, colour = "length")) +
@@ -360,60 +357,68 @@ ggplot(aggregated_data, aes(x = time_period)) +
   labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
   theme(legend.position = c(0.25, 0.1)) + 
   ggtitle("Długość śledzia wraz z temperaturą pod powierzchnią wody na przestrzeni lat")
+```
+Mimo występowania korelacji pomiędzy długością, a oscylacją północnoatlantycką, żaden z regresorów nie uznawał tego atrybutu za istotny. 
+Mniejszą zależność widać w przypadku lcop2 (i chel2). 
 
-
+```{r}
 ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
   geom_line(aes(y = nao + 25, colour = "nao")) +
   geom_line(aes(y = length, colour = "length")) +
-  scale_y_continuous(sec.axis = sec_axis(~.-25, name = columns_names["nao"])) + 
+  scale_y_continuous(sec.axis = sec_axis(~.-25, name = columns_names["nao"])) +
   scale_colour_manual(values = c("blue", "red")) +
   labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
-  theme(legend.position = c(0.25, 0.1)) + 
+  theme(legend.position = c(0.25, 0.1)) +
   ggtitle("Długość śledzia wraz z oscylacja północnoatlantycką na przestrzeni lat")
+```
 
+Często istotnym atrybutem jest atrybut lcop1 (jak i chel1 poprzez korelacje) czyli dostępność planktonu [zagęszczenie widłonogów gat. 1]. Można zauważyć podobny trend zmian tych wartości do trendu zmian wartości długości. Dodatkowo jest on skorelowany z oscylacją północnoatlantycką, przez co ten drugi atrybut może nie występować w istotnych atrybutach.  
+```{r}
 ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
   geom_line(aes(y = lcop1 / 10 + 25 , colour = "lcop1")) +
   geom_line(aes(y = length, colour = "length")) +
-  scale_y_continuous(sec.axis = sec_axis(~ (.- 25) * 10, name = columns_names["lcop1"])) + 
+  scale_y_continuous(sec.axis = sec_axis(~ (.- 25) * 10, name = columns_names["lcop1"])) +
   scale_colour_manual(values = c("blue", "red")) +
   labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
-  theme(legend.position = c(0.25, 0.1)) + 
+  theme(legend.position = c(0.25, 0.1)) +
   ggtitle("Długość śledzia wraz z zagęszczeniem widłogonów gat. 1 na przestrzeni lat")
 
 ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
   geom_line(aes(y = chel1 / 10 + 25 , colour = "chel1")) +
   geom_line(aes(y = length, colour = "length")) +
-  scale_y_continuous(sec.axis = sec_axis(~ (.- 25) * 10, name = columns_names["chel1"])) + 
+  scale_y_continuous(sec.axis = sec_axis(~ (.- 25) * 10, name = columns_names["chel1"])) +
   scale_colour_manual(values = c("blue", "red")) +
   labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
-  theme(legend.position = c(0.25, 0.1)) + 
+  theme(legend.position = c(0.25, 0.1)) +
   ggtitle("Długość śledzia wraz z atrubutem chel1 na przestrzeni lat")
 
 ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
   geom_line(aes(y = lcop2 / 10 + 22 , colour = "lcop2")) +
   geom_line(aes(y = length, colour = "length")) +
-  scale_y_continuous(sec.axis = sec_axis(~ (.- 22) * 10, name = columns_names["lcop2"])) + 
+  scale_y_continuous(sec.axis = sec_axis(~ (.- 22) * 10, name = columns_names["lcop2"])) +
   scale_colour_manual(values = c("blue", "red")) +
   labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
-  theme(legend.position = c(0.25, 0.1)) + 
+  theme(legend.position = c(0.25, 0.1)) +
   ggtitle("Długość śledzia wraz z atrubutem lcop2 na przestrzeni lat")
+```
 
+Wartości cumf i rect wydają się nie mieć wpływu na zmianę długości śledzia na przestrzeni lat. 
+```{r}
 ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
-  geom_line(aes(y = cumf * 100 , colour = "cumf")) +S
+  geom_line(aes(y = cumf * 100 , colour = "cumf")) +
   geom_line(aes(y = length, colour = "length")) +
-  scale_y_continuous(sec.axis = sec_axis(~. / 100, name = columns_names["cumf"])) + 
+  scale_y_continuous(sec.axis = sec_axis(~. / 100, name = columns_names["cumf"])) +
   scale_colour_manual(values = c("blue", "red")) +
   labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
-  theme(legend.position = c(0.25, 0.1)) + 
+  theme(legend.position = c(0.25, 0.1)) +
   ggtitle("Długość śledzia wraz z rocznym natęzeniem połowów na przestrzeni lat")
 
 ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
   geom_line(aes(y = recr * 0.00005 , colour = "recr")) +
   geom_line(aes(y = length, colour = "length")) +
-  scale_y_continuous(sec.axis = sec_axis(~. / 0.00005, name = columns_names["recr"])) + 
+  scale_y_continuous(sec.axis = sec_axis(~. / 0.00005, name = columns_names["recr"])) +
   scale_colour_manual(values = c("blue", "red")) +
   labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
-  theme(legend.position = c(0.25, 0.1)) + 
+  theme(legend.position = c(0.25, 0.1)) +
   ggtitle("Długość śledzia wraz z rocznym narybkiem na przestrzeni lat")
-
 ```
