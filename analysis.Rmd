@@ -121,7 +121,7 @@ plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=funct
   
 
 missing_data_columns <- c("cfin1", "cfin2", "chel1", "chel2", "lcop1", "lcop2", "sst")
-plot_histograms(data, columns = missing_data_columns, createName = function(x) paste0("Histogram ", x, " przed pozbyciem się brakujących danych"), nrow=2)
+# plot_histograms(data, columns = missing_data_columns, createName = function(x) paste0("Histogram ", x, " przed pozbyciem się brakujących danych"), nrow=2)
 # mice_plot <- aggr(data, col=c('navyblue','yellow'),
 #                     numbers=TRUE, sortVars=TRUE,
 #                     labels=names(data), cex.axis=.7,
@@ -129,7 +129,7 @@ plot_histograms(data, columns = missing_data_columns, createName = function(x) p
 completed_data <- data %>%
   mice(m=3,  method = 'cart', seed = 63) %>%
   complete(2)
-plot_histograms(completed_data, columns = missing_data_columns, createName = function(x) paste0("Histogram ", x, " po pozbyciu się brakujących danych"), nrow=2)
+# plot_histograms(completed_data, columns = missing_data_columns, createName = function(x) paste0("Histogram ", x, " po pozbyciu się brakujących danych"), nrow=2)
 
 ```
 
@@ -263,7 +263,7 @@ glmnet <- train(length ~ .,
              tuneGrid = glmnet_grid,
              importance=TRUE)
 
-glmnet_metrics = evaluate_model(glmnet, training)
+glmnet_metrics = evaluate_model(glmnet, testing)
 ```
 
 
@@ -286,13 +286,15 @@ random_forest <- train(length ~ .,
              ntree = 10,
              importance=TRUE)
 
-rf_metrics = evaluate_model(random_forest, training)
+rf_metrics = evaluate_model(random_forest, testing)
 
 ```
 
 
 
 ## Gradient Boosting Regressor
+
+Podane parametry zostały znaliezone wcześniej wykorzystując grid search, jednakż trwało to bardzo długo i żeby nie ponawiać tych obliczeń parametry zostały tu wpisane na sztywno.
 
 ```{r gbm-chunk, cache=TRUE}
 
@@ -307,16 +309,20 @@ gbm_grid <- expand.grid(
 
 set.seed(23)
 
+params <- data.frame( shrinkage = 0.1, n.trees = 1000, interaction.depth = 10, n.minobsinnode = 10)
+
+
 gbm <- train(length ~ ., 
              data = training, 
              method = "gbm", 
              metric = "RMSE",
-             trControl = ctrl,
-             tuneGrid = gbm_grid,
+             tuneGrid = params,
+             # trControl = ctrl,
+             # tuneGrid = gbm_grid,
              preProc = c("center", "scale"),
              verbose = FALSE)
 
-gbm_metrics = evaluate_model(gbm, training)
+gbm_metrics = evaluate_model(gbm, testing)
 ggplot(varImp(gbm))
 ```
 
@@ -393,7 +399,7 @@ ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
   ggtitle("Długość śledzia wraz z atrubutem lcop2 na przestrzeni lat")
 
 ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
-  geom_line(aes(y = cumf * 100 , colour = "cumf")) +
+  geom_line(aes(y = cumf * 100 , colour = "cumf")) +S
   geom_line(aes(y = length, colour = "length")) +
   scale_y_continuous(sec.axis = sec_axis(~. / 100, name = columns_names["cumf"])) + 
   scale_colour_manual(values = c("blue", "red")) +
