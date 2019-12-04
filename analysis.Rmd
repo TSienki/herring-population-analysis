@@ -9,7 +9,7 @@ output:
 ---
 
 # Podsumowanie analizy
-
+Celem analizy było określenie głównych przyczyn stopniowego zmniejszania się długości śledzi oceanicznych wyławianych w Europie. Analiza doprowadziła do wniosków, że istotny wpływ na długość miała temperatura przy powierzchni wody i to ona mogła doprowadzić do zmian długości. Duży wpływ na długość śledzia miały również wartości związane z dostępnością planktonu, co jest logiczne gdyż plankton jest pożywieniem dla śledzi. Wszystkie te wartości mogą jednak być związane z oscylacją północnoatlantycką, która jest zjawiskiem meteorologicznym i może mieć związek z temperaturą wody przy powierzchni i poprzez cyrkulację wody oceanicznej z dostępnością planktonu. Wartość ta jest przeciwnie skorelowana z długością, jednakże żaden regresor nie uznał jej za istotną. W danych brakuje informacji o roku pomiaru co utrudnia analizę, jednakże można ją wyłuskać z atrybutów rocznego narybku i rocznego natężenia połowów w rejonie. 
 
 # Wprowadzenie
 ### Opis problemu
@@ -32,7 +32,7 @@ Wszystkie dane, są danymi liczbowymi, nie występują żadne dane kategoryczne.
 * __fbar__: natężenie połowów w regionie [ułamek pozostawionego narybku];
 * __recr__: roczny narybek [liczba śledzi];
 * __cumf__: łączne roczne natężenie połowów w regionie [ułamek pozostawionego narybku];
-* __totaln__: łączna liczba ryb złowionych w ramach połowu [liczba śledzi] - liczba całkowita;
+* __totaln__: łączna liczba ryb złowionych w ramach połowu [liczba śledzi];
 * __sst__: temperatura przy powierzchni wody [°C];
 * __sal__: poziom zasolenia wody [Knudsen ppt];
 * __xmonth__: miesiąc połowu [numer miesiąca];
@@ -40,7 +40,7 @@ Wszystkie dane, są danymi liczbowymi, nie występują żadne dane kategoryczne.
 
 ### Inicjalizacja środowiska 
 
-```{r echo=FALSE, results='hide', message=FALSE}
+```{r results='hide', message=FALSE}
 library(dplyr)
 library(ggplot2)
 library(GGally) # ggpairplot
@@ -50,6 +50,8 @@ library(ggpubr) # ggarange
 library(corrplot) # ggarange
 library(plotly)
 library(caret)
+library(gbm)
+library(doMC)
 
 columns_names <- c("length" = "długość złowionego śledzia [cm]",
   "cfin1" = "dostępność planktonu [zagęszczenie Calanus finmarchicus gat. 1]",
@@ -94,7 +96,7 @@ head(data, 10)
 ```
 W celu poradzenia sobie z brakującymi danymi zostaje wykorzystana metoda MICE (Multivariate Imputation via Chained Equations). Metoda ta pozwala na pozbycie się brakujących danych z utrzymaniem podobnego rozkład
 
-```{r cache = true}
+```{r mice-chunk, cache=TRUE}
 plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=function(x) x, bins=30){
   if(is.null(columns)){
     columns <- names(data)
@@ -177,11 +179,16 @@ linear_model_3 <- lm(fbar ~ cumf, data = completed_data)
 
 Poniżej przedstawiona została analiza długości śledzia na przestrzeni czasu. Jednakże czas nie był przedstawiony jawnie, ale wiadomo, że dane są ustawione chronologicznie dzięki czemu, zbiór można podzielić i na każdym z podziałów policzyć średnią. Można zauważyć, że na początku długość śledzia na przestrzeni czasu wzrastała od średniej wielkości w oklicach 24.5 cm do wielkości wielkości przekraczającej 27cm. Jednakże później trend się odwrócił i ostatecznie na sam koniec średnia ta była poniżej 24 cm. 
 ```{r}
-cases_per_aggregate <- 200
-aggregated_data <- aggregate(completed_data, 
-                        list(rep(1:(nrow(completed_data)%/%cases_per_aggregate+1), each=cases_per_aggregate, len=nrow(completed_data))),
+aggregate_data <- function(data, cases_per_aggregate){
+  new_aggregated_data <- aggregate(data, 
+                        list(rep(1:(nrow(data)%/%cases_per_aggregate+1), each=cases_per_aggregate, len=nrow(data))),
                         mean) # Try using mean without outliners
-aggregated_data$time_period = c(1:nrow(aggregated_data))
+  new_aggregated_data$time_period = c(1:nrow(new_aggregated_data))
+  new_aggregated_data
+}
+
+
+aggregated_data <- aggregate_data(completed_data, 200)
 ggplot(aggregated_data, aes(time_period, length)) +
   geom_point() + 
   geom_smooth() +
@@ -213,54 +220,7 @@ testing  <- completed_data[-train_index,]
 
 r_squared <- function (x, y) cor(x, y) ^ 2
 
-```
-
-## Random Forest
-
-It works, but without grid searching. 
-```{r}
-set.seed(23)
-
-ctrl <- trainControl(
-  method = "repeatedcv",
-  number = 5,
-  repeats = 3,
-  search = 'random'
-)
-
-
-random_forest <- train(length ~ .,
-             data = training,
-             method = "rf",
-             preProc = c("center", "scale"),
-             metric = "RMSE",
-             trControl = ctrl,
-             ntree = 10,
-             importance=TRUE,
-             verbose=TRUE)
-
-```
-
-```{r}
-evaluate_model <- function(model, test_data) {
-  plot <- ggplot(varImp(model))
-  print(plot)
-  print(model)
-  predicted <- predict(model, newdata = test_data)
-  print(paste0("RMSE, na zbiorze testowym: ", RMSE(predicted, testing$length), " R-Squared na zbiorze testowym ", r_squared(predicted, test_data$length))) 
-}
-
-evaluate_model(random_forest, training)
-
-```
-
-It doesn't work (slow computing) :/  
-
-```{r}
-set.seed(23)
-modelLookup(model='rf')
-
-rf_grid <- expand.grid(mtry=c(2, 3, 4, 5, 6, 7, 8, 9, 11, 14))
+registerDoMC(cores=8)
 
 ctrl <- trainControl(
   method = "repeatedcv",
@@ -268,6 +228,53 @@ ctrl <- trainControl(
   repeats = 3
   )
 
+evaluate_model <- function(model, test_data) {
+  print(model)
+  plot <- ggplot(varImp(model))
+  print(varImp(model))
+  print(plot)
+  predicted <- predict(model, newdata = test_data)
+  rmse_ <- RMSE(predicted, test_data$length)
+  rsquared <- r_squared(predicted, test_data$length)
+  print(paste0("RMSE na zbiorze testowym: ", rmse_, " R-Squared na zbiorze testowym ", rsquared))
+  c(rmse_, rsquared)
+}
+
+```
+
+## Elastic Net
+
+
+```{r glmnet-chunk, cache=TRUE}
+modelLookup(model='glmnet')
+glmnet_grid = expand.grid(
+  alpha = 0:1,
+  lambda = seq(0.0001, 1, length = 100)
+)
+
+set.seed(23)
+
+glmnet <- train(length ~ .,
+             data = training,
+             method = "glmnet",
+             preProc = c("center", "scale"),
+             metric = "RMSE",
+             trControl = ctrl,
+             tuneGrid = glmnet_grid,
+             importance=TRUE)
+
+glmnet_metrics = evaluate_model(glmnet, training)
+```
+
+
+## Random Forest
+
+
+```{r rf-chunk, cache=TRUE}
+set.seed(23)
+modelLookup(model='rf')
+
+rf_grid <- expand.grid(mtry=c(2, 3, 4, 5, 6, 7, 8, 9, 11, 14))
 
 random_forest <- train(length ~ .,
              data = training,
@@ -279,17 +286,15 @@ random_forest <- train(length ~ .,
              ntree = 10,
              importance=TRUE)
 
-evaluate_model(random_forest, training)
+rf_metrics = evaluate_model(random_forest, training)
 
 ```
 
 
+
 ## Gradient Boosting Regressor
 
-It doesn't work (slow computing) :/  
-
-
-```{r}
+```{r gbm-chunk, cache=TRUE}
 
 modelLookup(model='gbm')
 
@@ -301,12 +306,6 @@ gbm_grid <- expand.grid(
   )
 
 set.seed(23)
-gbm_grid 
-# gbm_grid <-  expand.grid(interaction.depth = c(1, 3, 6, 9, 10),
-#                     n.trees = (0:50)*50, 
-#                     shrinkage = seq(.0005, .05,.0005),
-#                     n.minobsinnode = c(5, 10, 15, 20))
-
 
 gbm <- train(length ~ ., 
              data = training, 
@@ -317,24 +316,98 @@ gbm <- train(length ~ .,
              preProc = c("center", "scale"),
              verbose = FALSE)
 
-evaluate_model(gbm)
+gbm_metrics = evaluate_model(gbm, training)
+ggplot(varImp(gbm))
 ```
 
-## Random Forest
+## Podsumowanie regresorów 
+
+Jak można zauważyć poniżej najlepszymi modelami okazały się modele oparte na algorytmach Gradient Boosting i Random Forest. Nieco gorzej sprawdza się algorytm random forest. Najgorzej i poniżej oczekiwań działa algorytm Elastic Net, co może być związane z wykorzystaniem regresji liniowej wewnątrz algorytmu. 
+
+```{r}
+metrics <- data.frame(
+   regressor = c("Elastic Net","Random Forest","Gradient Boosting Regressor"),
+   rmse = c(glmnet_metrics[1], rf_metrics[1], gbm_metrics[1]), 
+   rsquared = c(glmnet_metrics[2], rf_metrics[2], gbm_metrics[2])
+)
+
+metrics
+```
+
+Analizując istotność danych dla Elastic Net trzema najistotniejszymi atrybutami są fbar, cumf i sst, a najmniej istotnymi chel2, xmonth i sal. Dla algorytmu random forest najistotniejszymi  były xmonth, chel1 i cfin2, a najmniej istotne cumf, sal i mao. 
+Najważniejszymi atrybutami dla algorytmu Gradient Boosting były sst, recr i xmonth, a najmniej istotnymi chel1, fbar i sal (wszystkie bardzo niskie).
+
+Można się spodziewać, że atrybut xmonth jest skorelowany z długością (jest to najistotniejszy atrybut dla Random Forest i trzeci najbardziej istotny dla Gradient Boosting). Jednakże nie oznacza to, że jest to wynik wieloletniego trendu, a może na przykład wynikać z wahań związanych z okresami godowymi lub okresami zwiększonego połowu.  
+Można zauważyć dużą istotność atrybutu sst - najistotniejszy atrybut dla Gradient Boosting, trzeci najbardziej istotny dla Elastic Net. Na wykresie poniżej można zauważyć że średnia długość śledzia jest przeciwnie skorelowana z temperaturą wody przy powierzchni. Może to świadczyć, że jest to powód zmian długości śledzi na przestrzeni lat.
+Mimo występowania korelacji pomiędzy długością, a oscylacją północnoatlantycką, żaden z regresorów nie uznawał tego atrybutu za istotny. 
+Często istotnym atrybutem jest atrybut lcop1 (jak i chel1 poprzez korelacje) czyli dostępność planktonu [zagęszczenie widłonogów gat. 1]. Można zauważyć podobny trend zmian tych wartości do trendu zmian wartości długości. Dodatkowo jest on skorelowany z oscylacją północnoatlantycką, przez co nie występuje ten drugi atrybut w istotnych atrybutach.  Mniejszą zależność widać w przypadku lcop2 (i chel2). 
+Wartości cumf i rect wydają się nie mieć wpływu na zmianę długości śledzia na przestrzeni lat. 
 
 
-# Wymagania
-**Do usunięcia później**
-TODO
-5. Sekcję podsumowującą rozmiar zbioru i podstawowe statystyki.
-9. Sekcję próbującą stworzyć regresor przewidujący rozmiar śledzia (w tej sekcji należy wykorzystać wiedzę z pozostałych punktów oraz wykonać dodatkowe czynności, które mogą poprawić trafność predykcji); dobór parametrów modelu oraz oszacowanie jego skuteczności powinny zostać wykonane za pomocą techniki podziału zbioru na dane uczące, walidujące i testowe; trafność regresji powinna zostać oszacowana na podstawie miar R2 i RMSE.
-10. Analizę ważności atrybutów najlepszego znalezionego modelu regresji. Analiza ważności atrybutów powinna stanowić próbę odpowiedzi na pytanie: co sprawia, że rozmiar śledzi zaczął w pewnym momencie maleć.
+```{r}
 
-Done
-1. Kod wyliczający wykorzystane biblioteki.
-2. Kod zapewniający powtarzalność wyników przy każdym uruchomieniu raportu na tych samych danych.
-3. Kod pozwalający wczytać dane z pliku.
-4. Kod przetwarzający brakujące dane.
-6. Szczegółową analizę wartości atrybutów (np. poprzez prezentację rozkładów wartości).
-7. Sekcję sprawdzającą korelacje między zmiennymi; sekcja ta powinna zawierać jakąś formę graficznej prezentacji korelacji.
-8. Interaktywny wykres lub animację prezentującą zmianę rozmiaru śledzi w czasie.
+ggplot(aggregated_data, aes(x = time_period)) +
+  geom_point(aes(y = sst * 2, colour = "sst")) +
+  geom_point(aes(y = length, colour = "length")) +
+  scale_y_continuous(sec.axis = sec_axis(~.*0.5, name = columns_names["lcop1"])) + 
+  scale_colour_manual(values = c("blue", "red")) +
+  labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
+  theme(legend.position = c(0.25, 0.1)) + 
+  ggtitle("Długość śledzia wraz z temperaturą pod powierzchnią wody na przestrzeni lat")
+
+
+ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
+  geom_line(aes(y = nao + 25, colour = "nao")) +
+  geom_line(aes(y = length, colour = "length")) +
+  scale_y_continuous(sec.axis = sec_axis(~.-25, name = columns_names["nao"])) + 
+  scale_colour_manual(values = c("blue", "red")) +
+  labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
+  theme(legend.position = c(0.25, 0.1)) + 
+  ggtitle("Długość śledzia wraz z oscylacja północnoatlantycką na przestrzeni lat")
+
+ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
+  geom_line(aes(y = lcop1 / 10 + 25 , colour = "lcop1")) +
+  geom_line(aes(y = length, colour = "length")) +
+  scale_y_continuous(sec.axis = sec_axis(~ (.- 25) * 10, name = columns_names["lcop1"])) + 
+  scale_colour_manual(values = c("blue", "red")) +
+  labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
+  theme(legend.position = c(0.25, 0.1)) + 
+  ggtitle("Długość śledzia wraz z zagęszczeniem widłogonów gat. 1 na przestrzeni lat")
+
+ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
+  geom_line(aes(y = chel1 / 10 + 25 , colour = "chel1")) +
+  geom_line(aes(y = length, colour = "length")) +
+  scale_y_continuous(sec.axis = sec_axis(~ (.- 25) * 10, name = columns_names["chel1"])) + 
+  scale_colour_manual(values = c("blue", "red")) +
+  labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
+  theme(legend.position = c(0.25, 0.1)) + 
+  ggtitle("Długość śledzia wraz z atrubutem chel1 na przestrzeni lat")
+
+ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
+  geom_line(aes(y = lcop2 / 10 + 22 , colour = "lcop2")) +
+  geom_line(aes(y = length, colour = "length")) +
+  scale_y_continuous(sec.axis = sec_axis(~ (.- 22) * 10, name = columns_names["lcop2"])) + 
+  scale_colour_manual(values = c("blue", "red")) +
+  labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
+  theme(legend.position = c(0.25, 0.1)) + 
+  ggtitle("Długość śledzia wraz z atrubutem lcop2 na przestrzeni lat")
+
+ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
+  geom_line(aes(y = cumf * 100 , colour = "cumf")) +
+  geom_line(aes(y = length, colour = "length")) +
+  scale_y_continuous(sec.axis = sec_axis(~. / 100, name = columns_names["cumf"])) + 
+  scale_colour_manual(values = c("blue", "red")) +
+  labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
+  theme(legend.position = c(0.25, 0.1)) + 
+  ggtitle("Długość śledzia wraz z rocznym natęzeniem połowów na przestrzeni lat")
+
+ggplot(aggregate_data(completed_data, 1000), aes(x = time_period)) +
+  geom_line(aes(y = recr * 0.00005 , colour = "recr")) +
+  geom_line(aes(y = length, colour = "length")) +
+  scale_y_continuous(sec.axis = sec_axis(~. / 0.00005, name = columns_names["recr"])) + 
+  scale_colour_manual(values = c("blue", "red")) +
+  labs(y = columns_names["length"], x = "Przedział czasowy", colour = "Wartości") +
+  theme(legend.position = c(0.25, 0.1)) + 
+  ggtitle("Długość śledzia wraz z rocznym narybkiem na przestrzeni lat")
+
+```
