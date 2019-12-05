@@ -9,7 +9,7 @@ output:
 ---
 
 # Podsumowanie analizy
-Celem analizy było określenie głównych przyczyn stopniowego zmniejszania się długości śledzi oceanicznych wyławianych w Europie. Analiza doprowadziła do wniosków, że istotny wpływ na długość miała temperatura przy powierzchni wody i to ona mogła doprowadzić do zmian długości. Duży wpływ na długość śledzia miały również wartości związane z dostępnością planktonu, co jest logiczne gdyż plankton jest pożywieniem dla śledzi. Wszystkie te wartości mogą jednak być związane z oscylacją północnoatlantycką, która jest zjawiskiem meteorologicznym i może mieć związek z temperaturą wody przy powierzchni i poprzez cyrkulację wody oceanicznej z dostępnością planktonu. Wartość ta jest przeciwnie skorelowana z długością, jednakże żaden regresor nie uznał jej za istotną. W danych brakuje informacji o roku pomiaru co utrudnia analizę, jednakże można ją wyłuskać z atrybutów rocznego narybku i rocznego natężenia połowów w rejonie. 
+Celem analizy było określenie głównych przyczyn stopniowego zmniejszania się długości śledzi oceanicznych wyławianych w Europie. Analiza doprowadziła do wniosków, że istotny wpływ na długość miała temperatura przy powierzchni wody i to ona mogła doprowadzić do zmian długości. Przy wzroscie temperatury z roku na rok długość śledzia stopniowo malała. Duży wpływ na długość śledzia miały również wartości związane z dostępnością planktonu, co jest logiczne gdyż plankton jest pożywieniem dla śledzi. Wszystkie te wartości mogą jednak być związane z oscylacją północnoatlantycką, która jest zjawiskiem meteorologicznym i może mieć związek z temperaturą wody przy powierzchni i poprzez cyrkulację wody oceanicznej z dostępnością planktonu. Wartość ta jest przeciwnie skorelowana z długością, jednakże żaden regresor nie uznał jej za istotną. W danych brakuje informacji o roku pomiaru co utrudnia analizę, jednakże można ją wyłuskać z atrybutów rocznego narybku i rocznego natężenia połowów w rejonie. 
 
 # Wprowadzenie
 ### Opis problemu
@@ -81,7 +81,7 @@ prettyTable <- function(table_df, round_columns=numeric(), round_digits=2) {
 
 ### Wczytanie i wstepne oczyszczenie danych
 
-Pierwszym krokiem jest wczytanie danych oraz bliższe przyjżenie się im. Ponieważ w pliku csv brakujące rekordy zapisane są jako "?" trzeba je poprawnie wczytać.Brakujące dane występują w kolumnach cfin1, cfin2, chel1, chel2, lcop1, lcop2 i lsst. 
+Pierwszym krokiem jest wczytanie danych oraz bliższe przyjżenie się im. Ponieważ w pliku csv brakujące rekordy zapisane są jako "?" trzeba je poprawnie wczytać. Brakujące dane występują w kolumnach cfin1, cfin2, chel1, chel2, lcop1, lcop2 i lsst. 
 Jako że kolumna x to po prostu numer pomiaru, nie będzie nam potrzebna.
 
 ```{r}
@@ -135,13 +135,18 @@ completed_data <- data %>%
 
 ### Eksploracja danych 
 
-Podsumowanie danych
+Podsumowanie danych ich podstawowych statystyk.
 ```{r}
 summary(completed_data)
 ```
 
-Histogramy wartości atrybutów w zbiorze danych. 
-Jak można zauwyć wartości długości śledzia przyjmują rozkład normalny ze średnią na poziomie 25.3 cm i przyjmują wartości w granicach 19-32.5cm. 
+Histogramy wartości atrybutów w zbiorze danych.
+
+Jak można zauważyć wartości długości śledzia przyjmują rozkład normalny ze średnią na poziomie 25.3 cm i przyjmują wartości w granicach 19-32.5cm.
+
+Najwięcej połowów występuje w okresie letnim (czerwiec - wrzesień) oraz w październiku. 
+
+Pozostałe atrybuty zostały opisane na poniższych histogramach.
 ```{r}
 plot_histograms(completed_data, createName = function(x) paste0("Histogram - ", columns_names[x]), nrow=1, bins=40)
 
