@@ -94,7 +94,7 @@ summary(data)
 paste0("Ilość badanych przypadków: ", nrow(data), ", ilość zmiennych: ", ncol(data))
 head(data, 10)
 ```
-W celu poradzenia sobie z brakującymi danymi zostaje wykorzystana metoda MICE (Multivariate Imputation via Chained Equations). Metoda ta pozwala na pozbycie się brakujących danych z utrzymaniem podobnego rozkład
+W celu poradzenia sobie z brakującymi danymi zostaje wykorzystana metoda MICE (Multivariate Imputation via Chained Equations). Metoda ta pozwala na pozbycie się brakujących danych z utrzymaniem podobnego rozkładu.
 
 ```{r mice-chunk, cache=TRUE}
 plot_histograms <- function(data, columns=NULL, ncol=1, nrow=1, createName=function(x) x, bins=30){
@@ -140,8 +140,8 @@ Podsumowanie danych
 summary(completed_data)
 ```
 
-Histogramy wartości atrybutów w zbiorze danych 
-Jak można zauwyć wartości długości śledzia przyjmują rozkład normalny z średnią na poziomie 25.3 cm i przyjmuje wartości w granicach 19-32.5cm. 
+Histogramy wartości atrybutów w zbiorze danych. 
+Jak można zauwyć wartości długości śledzia przyjmują rozkład normalny ze średnią na poziomie 25.3 cm i przyjmują wartości w granicach 19-32.5cm. 
 ```{r}
 plot_histograms(completed_data, createName = function(x) paste0("Histogram - ", columns_names[x]), nrow=1, bins=40)
 
@@ -149,7 +149,7 @@ plot_histograms(completed_data, createName = function(x) paste0("Histogram - ", 
 ```
 
 Poniżej została przedstawiona korelacja pomiędzy atrybutami.
-Można zauważyć, że występuje wysoka korelacja pomiędzy parami atrybutów chel1-lcop1, chel2-lcop2 oraz fbar-cumf. Korelacja może występować, ponieważ, dwie pierwsze pary związane są z dostępnością zaś ostatnia para korelacji może występować, ponieważ obydwa atrybuty związane są z natężeniem popłowu w regionie. Można te pary zredukować, aby przeciwdziałać klątwie wielowymiarowości - jednakże tutaj zostaną one zostawione bez zmian. 
+Można zauważyć, że występuje wysoka korelacja pomiędzy parami atrybutów chel1-lcop1 oraz chel2-lcop2, ponieważ związane są one z dostępnością planktonu. Korelacja występuje także pomiędzy fbar-cumf, ponieważ obydwa atrybuty związane są z natężeniem popłowu w regionie. Można te pary zredukować, aby przeciwdziałać klątwie wielowymiarowości - jednakże tutaj zostaną one zostawione bez zmian. 
 
 ```{r}
 corrplot(cor(completed_data), type = "upper",  tl.col = "black", tl.srt = 45, method="number")
